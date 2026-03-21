@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { CalendarDays, MapPin, User } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -42,6 +42,7 @@ function BookingForm({
   initialTripTime,
   suggestedPrice,
 }) {
+  const navigate = useNavigate()
   const [from, setFrom] = useState(initialFrom)
   const [to, setTo] = useState(initialTo)
   const [date, setDate] = useState(initialTripDate)
@@ -60,6 +61,7 @@ function BookingForm({
           className="space-y-5"
           onSubmit={(e) => {
             e.preventDefault()
+            navigate('/trips', { state: { from, to, date, passengers: Number(passengers) } })
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -158,7 +160,7 @@ function BookingForm({
           />
 
           <Button type="submit" size="lg" className="w-full sm:w-auto">
-            Continuer vers le paiement
+            Voir les trajets disponibles
           </Button>
         </form>
       </Card>
