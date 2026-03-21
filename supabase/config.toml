@@ -1,0 +1,5 @@
+# Supabase CLI — lier le projet : supabase link --project-ref <ref>
+# Edge Functions : supabase functions deploy admin-create-driver
+
+[functions.admin-create-driver]
+verify_jwt = true
