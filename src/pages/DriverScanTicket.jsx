@@ -74,6 +74,12 @@ export function DriverScanTicket() {
       if (bErr) throw new Error(bErr.message)
       setResult({ ok: true, booking })
       setScanPayload(v)
+      // Arrêter le scanner après un scan réussi
+      const scanner = scannerRef.current
+      if (scanner?.isScanning) {
+        try { await scanner.stop() } catch { /* ignore */ }
+        setScannerActive(false)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -299,7 +305,7 @@ export function DriverScanTicket() {
           type="text"
           value={refValue}
           onChange={(e) => setRefValue(e.target.value)}
-          placeholder="ex: a1b2c3d4-... (UUID complet)"
+          placeholder="ex: A1B2C3D4 (court) ou UUID complet"
           className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           autoComplete="off"
           spellCheck={false}
@@ -316,7 +322,23 @@ export function DriverScanTicket() {
             setScanPayload(null)
             setRefBusy(true)
             try {
-              const r = await validateTicketManuallyByBookingId(refValue.trim())
+              const input = refValue.trim()
+              // Résoudre le UUID complet depuis un court ID ou UUID complet
+              let fullId = input
+              if (input.length < 36) {
+                const { data: found } = await supabase
+                  .from('bookings')
+                  .select('id')
+                  .ilike('id', `${input.toLowerCase()}%`)
+                  .limit(1)
+                  .maybeSingle()
+                if (!found) {
+                  setResult({ ok: false, reason: 'BOOKING_NOT_FOUND', label: 'Réservation introuvable' })
+                  return
+                }
+                fullId = found.id
+              }
+              const r = await validateTicketManuallyByBookingId(fullId)
               if (!r.valid) {
                 setResult({
                   ok: false,
@@ -328,7 +350,7 @@ export function DriverScanTicket() {
               const { data: booking, error: bErr } = await supabase
                 .from('bookings')
                 .select('id, trip_id, seat_number, status, departure_city, destination_city, date, time, operator, price')
-                .eq('id', refValue.trim())
+                .eq('id', fullId)
                 .maybeSingle()
               if (bErr) throw new Error(bErr.message)
               setConfirmation({ ok: true, label: 'Billet validé et embarqué', usedAt: r.usedAt })
