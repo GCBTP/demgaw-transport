@@ -1,3 +1,12 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Camera, CheckCircle2, Hash, Loader2, ShieldCheck, XCircle } from 'lucide-react'
+import { Html5Qrcode } from 'html5-qrcode'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { supabase } from '../supabase/client'
+import { validateTicketManuallyByBookingId } from '../supabase/driverManifest'
+
 const REASON_LABEL = {
   TICKET_QR_SECRET_NOT_SET: 'Configuration billet indisponible',
   BAD_SIGNATURE: 'Signature du billet invalide',
