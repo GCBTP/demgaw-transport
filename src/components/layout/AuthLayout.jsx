@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Bus } from 'lucide-react'
 
 export function AuthLayout({ title, subtitle, children, footer }) {
   return (
@@ -9,9 +8,7 @@ export function AuthLayout({ title, subtitle, children, footer }) {
           to="/"
           className="mb-8 flex items-center justify-center gap-2.5 text-slate-900"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-[0_6px_20px_-6px_rgba(5,150,105,0.5)]">
-            <Bus className="h-6 w-6" aria-hidden />
-          </span>
+          <img src="/logo.svg" alt="DemGaw" className="h-12 w-12 object-contain" />
           <span className="text-xl font-bold tracking-tight">DemGaw</span>
         </Link>
 
