@@ -1,25 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  ArrowLeft,
-  Camera,
-  CheckCircle2,
-  ClipboardPaste,
-  Hash,
-  Loader2,
-  ShieldCheck,
-  XCircle,
-} from 'lucide-react'
-import { Html5Qrcode } from 'html5-qrcode'
-import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { supabase } from '../supabase/client'
-import {
-  consumeTicketFromScan,
-  validateTicketManuallyByBookingId,
-  validateTicketQrFromScan,
-} from '../supabase/driverManifest'
-
 const REASON_LABEL = {
   TICKET_QR_SECRET_NOT_SET: 'Configuration billet indisponible',
   BAD_SIGNATURE: 'Signature du billet invalide',
@@ -27,161 +5,117 @@ const REASON_LABEL = {
   EXPIRED: 'QR expiré (plus de 24 h)',
   BOOKING_NOT_FOUND: 'Réservation introuvable',
   NOT_PAID: 'Billet non payé',
-  ALREADY_USED: 'Ticket already used',
+  ALREADY_USED: 'Billet déjà utilisé',
+  NOT_AUTHORIZED: 'Non autorisé',
+  DRIVER_OPERATOR_NOT_SET: 'Opérateur chauffeur non configuré',
+}
+
+function playBeep(ok = true) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = ok ? 880 : 300
+    osc.type = 'sine'
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (ok ? 0.3 : 0.5))
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + (ok ? 0.3 : 0.5))
+  } catch { /* navigateur sans Web Audio */ }
 }
 
 export function DriverScanTicket() {
-  const [pasteValue, setPasteValue] = useState('')
   const [refValue, setRefValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [refBusy, setRefBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
-  const [scanPayload, setScanPayload] = useState(null)
-  const [confirmBusy, setConfirmBusy] = useState(false)
-  const [confirmation, setConfirmation] = useState(null)
+  const [lastResult, setLastResult] = useState(null) // { ok, label, booking? }
+  const [validated, setValidated] = useState([]) // historique session
   const [scannerReady, setScannerReady] = useState(false)
   const [scannerActive, setScannerActive] = useState(false)
   const scannerRef = useRef(null)
   const validatingRef = useRef(false)
 
-  const runValidate = useCallback(async (raw) => {
-    setError(null)
-    setResult(null)
-    setConfirmation(null)
-    setScanPayload(null)
-    setBusy(true)
-    try {
-      const v = await validateTicketQrFromScan(raw)
-      if (!v.valid) {
-        setResult({
-          ok: false,
-          reason: v.reason,
-          label:
-            (v.reason && REASON_LABEL[v.reason]) || v.reason || 'Billet refusé',
-        })
-        return
-      }
-
-      const { data: booking, error: bErr } = await supabase
-        .from('bookings')
-        .select(
-          'id, trip_id, seat_number, status, departure_city, destination_city, date, time, operator, price',
-        )
-        .eq('id', v.bookingId)
-        .maybeSingle()
-
-      if (bErr) throw new Error(bErr.message)
-      setResult({ ok: true, booking })
-      setScanPayload(v)
-      // Arrêter le scanner après un scan réussi
-      const scanner = scannerRef.current
-      if (scanner?.isScanning) {
-        try { await scanner.stop() } catch { /* ignore */ }
-        setScannerActive(false)
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-    }
+  const addToHistory = useCallback((booking, usedAt) => {
+    setValidated((prev) => [
+      { booking, usedAt: usedAt ?? new Date().toISOString(), key: Date.now() },
+      ...prev,
+    ])
   }, [])
 
-  const handleConfirmUse = useCallback(async () => {
-    if (!scanPayload || !result?.booking) return
-    setError(null)
-    setConfirmation(null)
-    setConfirmBusy(true)
+  const runValidate = useCallback(async (raw) => {
+    if (busy) return
+    setLastResult(null)
+    setBusy(true)
     try {
-      const r = await consumeTicketFromScan(scanPayload)
-      if (!r.valid) {
-        if (r.reason === 'ALREADY_USED') {
-          setConfirmation({
-            ok: false,
-            label: 'Ticket already used',
-            usedAt: r.usedAt,
-          })
-          return
-        }
-        setConfirmation({
-          ok: false,
-          label:
-            (r.reason && REASON_LABEL[r.reason]) ||
-            r.reason ||
-            'Validation refusée',
-        })
+      const line = String(raw ?? '').trim()
+      const parts = line.split('|').map((s) => s.trim())
+      if (parts.length < 4) throw new Error('QR invalide : format attendu avec 4 segments séparés par |')
+      const [bookingId, userId, tsStr, signature] = parts
+      const ts = Number(tsStr)
+      if (!bookingId || !userId || !Number.isFinite(ts) || !signature) throw new Error('QR invalide : données incomplètes')
+
+      const { data, error: rpcErr } = await supabase.rpc('driver_validate_and_use_ticket_qr_payload', {
+        p_booking_id: bookingId,
+        p_user_id: userId,
+        p_timestamp: ts,
+        p_signature: signature,
+      })
+      if (rpcErr) throw new Error(rpcErr.message)
+
+      if (!data?.valid) {
+        const reason = data?.reason ?? 'UNKNOWN'
+        playBeep(false)
+        setLastResult({ ok: false, label: REASON_LABEL[reason] || reason })
         return
       }
 
-      setConfirmation({
-        ok: true,
-        label: 'Valid Ticket',
-        usedAt: r.usedAt,
-      })
-      setResult((prev) =>
-        prev?.booking
-          ? {
-              ...prev,
-              booking: {
-                ...prev.booking,
-                status: 'used',
-                used_at: r.usedAt ?? prev.booking.used_at ?? null,
-              },
-            }
-          : prev,
-      )
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('id, seat_number, departure_city, destination_city, date, time, operator')
+        .eq('id', bookingId)
+        .maybeSingle()
+
+      playBeep(true)
+      addToHistory(booking, data.used_at)
+      setLastResult({ ok: true, label: 'Embarqué ✓', booking })
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      playBeep(false)
+      setLastResult({ ok: false, label: e instanceof Error ? e.message : String(e) })
     } finally {
-      setConfirmBusy(false)
+      setBusy(false)
+      validatingRef.current = false
     }
-  }, [scanPayload, result?.booking])
+  }, [busy, addToHistory])
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
     if (!scanner) return
     try {
-      if (scanner.isScanning) {
-        await scanner.stop()
-      }
+      if (scanner.isScanning) await scanner.stop()
       await scanner.clear()
-    } catch {
-      // ignore stop errors from rapid navigation
-    } finally {
-      setScannerActive(false)
-    }
+    } catch { /* ignore */ }
+    finally { setScannerActive(false) }
   }, [])
 
   const startScanner = useCallback(async () => {
-    setError(null)
-    setResult(null)
+    setLastResult(null)
     try {
       if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode('driver-qr-reader')
       }
       const scanner = scannerRef.current
       const cameras = await Html5Qrcode.getCameras()
-      if (!cameras?.length) {
-        throw new Error('Aucune caméra détectée sur cet appareil.')
-      }
-
-      const preferredCamera = cameras.find((c) =>
-        /back|rear|environment|arrière/i.test(c.label),
-      )
-      const cameraId = preferredCamera?.id ?? cameras[0].id
-
+      if (!cameras?.length) throw new Error('Aucune caméra détectée.')
+      const preferred = cameras.find((c) => /back|rear|environment|arrière/i.test(c.label))
       await scanner.start(
-        cameraId,
-        {
-          fps: 8,
-          qrbox: { width: 260, height: 260 },
-          aspectRatio: 1.33,
-        },
+        preferred?.id ?? cameras[0].id,
+        { fps: 8, qrbox: { width: 260, height: 260 }, aspectRatio: 1.33 },
         async (decodedText) => {
           if (validatingRef.current) return
           validatingRef.current = true
           await runValidate(decodedText)
-          validatingRef.current = false
         },
       )
       setScannerActive(true)
@@ -189,15 +123,13 @@ export function DriverScanTicket() {
     } catch (e) {
       setScannerActive(false)
       setScannerReady(false)
-      setError(e instanceof Error ? e.message : String(e))
+      setLastResult({ ok: false, label: e instanceof Error ? e.message : String(e) })
     }
   }, [runValidate])
 
   useEffect(() => {
     void startScanner()
-    return () => {
-      void stopScanner()
-    }
+    return () => { void stopScanner() }
   }, [startScanner, stopScanner])
 
   return (
@@ -214,98 +146,45 @@ export function DriverScanTicket() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
             Scanner un billet
           </h1>
-          <p className="text-sm text-slate-600">Vérification du QR payé</p>
+          <p className="text-sm text-slate-600">
+            {validated.length > 0 ? `${validated.length} embarqué${validated.length > 1 ? 's' : ''} cette session` : 'Vérification QR en temps réel'}
+          </p>
         </div>
       </div>
 
+      {/* Scanner caméra */}
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-800">Caméra QR</p>
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-              scannerActive
-                ? 'bg-brand-100 text-brand-900'
-                : 'bg-slate-100 text-slate-700'
-            }`}
-          >
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${scannerActive ? 'bg-brand-100 text-brand-900' : 'bg-slate-100 text-slate-700'}`}>
             {scannerActive ? 'ACTIVE' : 'ARRÊTÉE'}
           </span>
         </div>
-        <div
-          id="driver-qr-reader"
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
-        />
+        <div id="driver-qr-reader" className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" />
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Button
-            type="button"
-            size="lg"
-            className="h-14 text-base font-semibold"
-            disabled={busy || scannerActive}
-            onClick={() => void startScanner()}
-          >
+          <Button type="button" size="lg" className="h-14 text-base font-semibold" disabled={busy || scannerActive} onClick={() => void startScanner()}>
             <Camera className="h-5 w-5" aria-hidden />
             Démarrer
           </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            className="h-14 text-base font-semibold"
-            disabled={busy || !scannerActive}
-            onClick={() => void stopScanner()}
-          >
+          <Button type="button" size="lg" variant="secondary" className="h-14 text-base font-semibold" disabled={busy || !scannerActive} onClick={() => void stopScanner()}>
             Stop
           </Button>
         </div>
-        {!scannerReady ? (
-          <p className="mt-3 text-xs text-slate-500">
-            Autorisez la caméra si le navigateur le demande.
-          </p>
-        ) : null}
+        {!scannerReady ? <p className="mt-3 text-xs text-slate-500">Autorisez la caméra si le navigateur le demande.</p> : null}
       </Card>
 
-      <Card className="p-5">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <ClipboardPaste className="h-4 w-4 text-brand-600" aria-hidden />
-          Coller le contenu du QR
-        </label>
-        <textarea
-          value={pasteValue}
-          onChange={(e) => setPasteValue(e.target.value)}
-          rows={4}
-          placeholder="booking_id|user_id|timestamp|signature"
-          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <Button
-          type="button"
-          size="lg"
-          className="mt-4 h-14 w-full text-base font-semibold"
-          disabled={busy || !pasteValue.trim()}
-          onClick={() => void runValidate(pasteValue)}
-        >
-          {busy ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-              Vérification…
-            </>
-          ) : (
-            'Valider'
-          )}
-        </Button>
-      </Card>
-
+      {/* Saisie référence manuelle */}
       <Card className="p-5">
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <Hash className="h-4 w-4 text-brand-600" aria-hidden />
-          Référence du billet (ID)
+          Référence du billet
         </label>
         <input
           type="text"
           value={refValue}
           onChange={(e) => setRefValue(e.target.value)}
-          placeholder="ex: A1B2C3D4 (court) ou UUID complet"
+          onKeyDown={(e) => { if (e.key === 'Enter' && refValue.trim() && !refBusy) e.currentTarget.form?.requestSubmit?.() }}
+          placeholder="Court ID (ex: A1B2C3D4) ou UUID complet"
           className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           autoComplete="off"
           spellCheck={false}
@@ -316,152 +195,77 @@ export function DriverScanTicket() {
           className="mt-4 h-14 w-full text-base font-semibold"
           disabled={refBusy || !refValue.trim()}
           onClick={async () => {
-            setError(null)
-            setResult(null)
-            setConfirmation(null)
-            setScanPayload(null)
+            setLastResult(null)
             setRefBusy(true)
             try {
               const input = refValue.trim()
-              // Résoudre le UUID complet depuis un court ID ou UUID complet
               let fullId = input
               if (input.length < 36) {
-                const { data: found } = await supabase
-                  .from('bookings')
-                  .select('id')
-                  .ilike('id', `${input.toLowerCase()}%`)
-                  .limit(1)
-                  .maybeSingle()
-                if (!found) {
-                  setResult({ ok: false, reason: 'BOOKING_NOT_FOUND', label: 'Réservation introuvable' })
-                  return
-                }
+                const { data: found } = await supabase.from('bookings').select('id').ilike('id', `${input.toLowerCase()}%`).limit(1).maybeSingle()
+                if (!found) { playBeep(false); setLastResult({ ok: false, label: 'Réservation introuvable' }); return }
                 fullId = found.id
               }
               const r = await validateTicketManuallyByBookingId(fullId)
               if (!r.valid) {
-                setResult({
-                  ok: false,
-                  reason: r.reason,
-                  label: (r.reason && REASON_LABEL[r.reason]) || r.reason || 'Billet refusé',
-                })
+                playBeep(false)
+                setLastResult({ ok: false, label: REASON_LABEL[r.reason] || r.reason || 'Billet refusé' })
                 return
               }
-              const { data: booking, error: bErr } = await supabase
-                .from('bookings')
-                .select('id, trip_id, seat_number, status, departure_city, destination_city, date, time, operator, price')
-                .eq('id', fullId)
-                .maybeSingle()
-              if (bErr) throw new Error(bErr.message)
-              setConfirmation({ ok: true, label: 'Billet validé et embarqué', usedAt: r.usedAt })
-              setResult({ ok: true, booking: { ...booking, status: 'used' } })
+              const { data: booking } = await supabase.from('bookings').select('id, seat_number, departure_city, destination_city, date, time, operator').eq('id', fullId).maybeSingle()
+              playBeep(true)
+              addToHistory(booking, r.usedAt)
+              setLastResult({ ok: true, label: 'Embarqué ✓', booking })
+              setRefValue('')
             } catch (e) {
-              setError(e instanceof Error ? e.message : String(e))
+              playBeep(false)
+              setLastResult({ ok: false, label: e instanceof Error ? e.message : String(e) })
             } finally {
               setRefBusy(false)
             }
           }}
         >
-          {refBusy ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-              Validation…
-            </>
-          ) : (
-            <>
-              <ShieldCheck className="h-5 w-5" aria-hidden />
-              Valider et embarquer
-            </>
-          )}
+          {refBusy ? <><Loader2 className="h-5 w-5 animate-spin" aria-hidden />Validation…</> : <><ShieldCheck className="h-5 w-5" aria-hidden />Valider et embarquer</>}
         </Button>
       </Card>
 
-      {error ? (
-        <Card className="border-red-100 bg-red-50/50 p-4">
-          <p className="text-sm font-semibold text-red-900">{error}</p>
-        </Card>
-      ) : null}
-
-      {result?.ok === false ? (
-        <Card className="border-amber-100 bg-amber-50/60 p-5">
-          <div className="flex items-start gap-3">
-            <XCircle className="h-8 w-8 shrink-0 text-amber-700" aria-hidden />
+      {/* Résultat dernier scan */}
+      {lastResult ? (
+        <Card className={`p-4 ${lastResult.ok ? 'border-brand-100 bg-brand-50/50' : 'border-red-100 bg-red-50/50'}`}>
+          <div className="flex items-center gap-3">
+            {lastResult.ok
+              ? <CheckCircle2 className="h-7 w-7 shrink-0 text-brand-700" aria-hidden />
+              : <XCircle className="h-7 w-7 shrink-0 text-red-600" aria-hidden />}
             <div>
-              <p className="font-bold text-amber-950">Billet non valide</p>
-              <p className="mt-1 text-sm text-amber-900">{result.label}</p>
+              <p className={`font-bold ${lastResult.ok ? 'text-brand-900' : 'text-red-900'}`}>{lastResult.label}</p>
+              {lastResult.booking ? (
+                <p className="text-sm text-slate-700">
+                  {lastResult.booking.departure_city} → {lastResult.booking.destination_city} · Siège {lastResult.booking.seat_number}
+                </p>
+              ) : null}
             </div>
           </div>
         </Card>
       ) : null}
 
-      {result?.ok === true && result.booking ? (
-        <Card className="border-brand-100 bg-brand-50/40 p-5">
-          <div className="flex items-start gap-3">
-            <CheckCircle2
-              className="h-8 w-8 shrink-0 text-brand-700"
-              aria-hidden
-            />
-            <div className="min-w-0 space-y-1">
-              <p className="font-bold text-brand-950">Billet valide</p>
-              <p className="text-lg font-semibold text-slate-900">
-                {result.booking.departure_city} → {result.booking.destination_city}
-              </p>
-              <p className="text-base text-slate-700">
-                {result.booking.date} · {result.booking.time}
-              </p>
-              <p className="text-base font-medium text-slate-800">
-                Siège {result.booking.seat_number}
-              </p>
-              <p className="font-mono text-xs text-slate-500">
-                {result.booking.id}
-              </p>
-              <p className="text-sm font-medium text-slate-700">
-                Statut: {result.booking.status}
-              </p>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            size="lg"
-            className="mt-4 h-14 w-full text-base font-semibold"
-            disabled={confirmBusy || busy || !scanPayload}
-            onClick={() => void handleConfirmUse()}
-          >
-            {confirmBusy ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                Validation…
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="h-5 w-5" aria-hidden />
-                Confirmer embarquement
-              </>
-            )}
-          </Button>
-        </Card>
-      ) : null}
-
-      {confirmation?.ok === true ? (
-        <Card className="border-brand-100 bg-brand-50/50 p-4">
-          <p className="text-sm font-bold text-brand-900">{confirmation.label}</p>
-          {confirmation.usedAt ? (
-            <p className="mt-1 text-xs text-brand-800">
-              used_at: {new Date(confirmation.usedAt).toLocaleString()}
-            </p>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {confirmation?.ok === false ? (
-        <Card className="border-amber-100 bg-amber-50/50 p-4">
-          <p className="text-sm font-bold text-amber-900">{confirmation.label}</p>
-          {confirmation.usedAt ? (
-            <p className="mt-1 text-xs text-amber-800">
-              used_at: {new Date(confirmation.usedAt).toLocaleString()}
-            </p>
-          ) : null}
+      {/* Historique session */}
+      {validated.length > 0 ? (
+        <Card className="p-4">
+          <p className="mb-3 text-sm font-bold text-slate-800">
+            Billets embarqués — session ({validated.length})
+          </p>
+          <ul className="space-y-2">
+            {validated.map((entry) => (
+              <li key={entry.key} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                <span className="font-medium text-slate-900">
+                  {entry.booking?.departure_city ?? '?'} → {entry.booking?.destination_city ?? '?'}
+                  {entry.booking?.seat_number ? ` · Siège ${entry.booking.seat_number}` : ''}
+                </span>
+                <span className="ml-3 shrink-0 font-mono text-xs text-slate-500">
+                  {new Date(entry.usedAt).toLocaleTimeString()}
+                </span>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
     </div>
