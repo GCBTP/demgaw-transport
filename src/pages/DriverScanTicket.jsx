@@ -4,8 +4,7 @@ import { ArrowLeft, Camera, CheckCircle2, Hash, Loader2, ShieldCheck, XCircle } 
 import { Html5Qrcode } from 'html5-qrcode'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { supabase } from '../supabase/client'
-import { validateTicketByRef, validateTicketManuallyByBookingId } from '../supabase/driverManifest'
+import { consumeTicketFromScan, validateTicketByRef } from '../supabase/driverManifest'
 
 const REASON_LABEL = {
   TICKET_QR_SECRET_NOT_SET: 'Configuration billet indisponible',
@@ -37,66 +36,62 @@ function playBeep(ok = true) {
 
 export function DriverScanTicket() {
   const [refValue, setRefValue] = useState('')
-  const [busy, setBusy] = useState(false)
   const [refBusy, setRefBusy] = useState(false)
-  const [lastResult, setLastResult] = useState(null) // { ok, label, booking? }
-  const [validated, setValidated] = useState([]) // historique session
+  const [lastResult, setLastResult] = useState(null)
+  const [validated, setValidated] = useState([])
   const [scannerReady, setScannerReady] = useState(false)
   const [scannerActive, setScannerActive] = useState(false)
   const scannerRef = useRef(null)
-  const validatingRef = useRef(false)
+  const lockRef = useRef(false) // remplace busy pour éviter stale closure
 
-  const addToHistory = useCallback((booking, usedAt) => {
+  function addToHistory(data) {
+    const booking = {
+      id: data.booking_id,
+      departure_city: data.departure_city,
+      destination_city: data.destination_city,
+      seat_number: data.seat_number,
+      date: data.date,
+      time: data.time,
+    }
     setValidated((prev) => [
-      { booking, usedAt: usedAt ?? new Date().toISOString(), key: Date.now() },
+      { booking, usedAt: data.used_at ?? new Date().toISOString(), key: Date.now() },
       ...prev,
     ])
-  }, [])
+    return booking
+  }
 
+  // Stable — jamais recréée, utilise lockRef pour éviter re-entrée
   const runValidate = useCallback(async (raw) => {
-    if (busy) return
+    if (lockRef.current) return
+    lockRef.current = true
     setLastResult(null)
-    setBusy(true)
     try {
       const line = String(raw ?? '').trim()
       const parts = line.split('|').map((s) => s.trim())
-      if (parts.length < 4) throw new Error('QR invalide : format attendu avec 4 segments séparés par |')
+      if (parts.length < 4) throw new Error('QR invalide : 4 segments séparés par | attendus')
       const [bookingId, userId, tsStr, signature] = parts
       const ts = Number(tsStr)
       if (!bookingId || !userId || !Number.isFinite(ts) || !signature) throw new Error('QR invalide : données incomplètes')
 
-      const { data, error: rpcErr } = await supabase.rpc('driver_validate_and_use_ticket_qr_payload', {
-        p_booking_id: bookingId,
-        p_user_id: userId,
-        p_timestamp: ts,
-        p_signature: signature,
-      })
-      if (rpcErr) throw new Error(rpcErr.message)
+      const data = await consumeTicketFromScan({ bookingId, userId, ts, signature })
 
-      if (!data?.valid) {
-        const reason = data?.reason ?? 'UNKNOWN'
+      if (!data.valid) {
         playBeep(false)
+        const reason = data.reason ?? 'UNKNOWN'
         setLastResult({ ok: false, label: REASON_LABEL[reason] || reason })
         return
       }
 
-      const { data: booking } = await supabase
-        .from('bookings')
-        .select('id, seat_number, departure_city, destination_city, date, time, operator')
-        .eq('id', bookingId)
-        .maybeSingle()
-
       playBeep(true)
-      addToHistory(booking, data.used_at)
+      const booking = addToHistory(data)
       setLastResult({ ok: true, label: 'Embarqué ✓', booking })
     } catch (e) {
       playBeep(false)
       setLastResult({ ok: false, label: e instanceof Error ? e.message : String(e) })
     } finally {
-      setBusy(false)
-      validatingRef.current = false
+      lockRef.current = false
     }
-  }, [busy, addToHistory])
+  }, []) // aucune dépendance → jamais recréée
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
@@ -121,11 +116,7 @@ export function DriverScanTicket() {
       await scanner.start(
         preferred?.id ?? cameras[0].id,
         { fps: 8, qrbox: { width: 260, height: 260 }, aspectRatio: 1.33 },
-        async (decodedText) => {
-          if (validatingRef.current) return
-          validatingRef.current = true
-          await runValidate(decodedText)
-        },
+        (decodedText) => { void runValidate(decodedText) },
       )
       setScannerActive(true)
       setScannerReady(true)
@@ -171,11 +162,11 @@ export function DriverScanTicket() {
         </div>
         <div id="driver-qr-reader" className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" />
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Button type="button" size="lg" className="h-14 text-base font-semibold" disabled={busy || scannerActive} onClick={() => void startScanner()}>
+          <Button type="button" size="lg" className="h-14 text-base font-semibold" disabled={scannerActive} onClick={() => void startScanner()}>
             <Camera className="h-5 w-5" aria-hidden />
             Démarrer
           </Button>
-          <Button type="button" size="lg" variant="secondary" className="h-14 text-base font-semibold" disabled={busy || !scannerActive} onClick={() => void stopScanner()}>
+          <Button type="button" size="lg" variant="secondary" className="h-14 text-base font-semibold" disabled={!scannerActive} onClick={() => void stopScanner()}>
             Stop
           </Button>
         </div>
@@ -213,13 +204,8 @@ export function DriverScanTicket() {
                 setLastResult({ ok: false, label: REASON_LABEL[r.reason] || r.reason || 'Billet refusé' })
                 return
               }
-              const { data: booking } = await supabase
-                .from('bookings')
-                .select('id, seat_number, departure_city, destination_city, date, time, operator')
-                .eq('id', r.bookingId)
-                .maybeSingle()
               playBeep(true)
-              addToHistory(booking, r.usedAt)
+              const booking = addToHistory(r)
               setLastResult({ ok: true, label: 'Embarqué ✓', booking })
               setRefValue('')
             } catch (e) {

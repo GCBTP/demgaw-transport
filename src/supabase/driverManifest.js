@@ -69,8 +69,14 @@ export async function consumeTicketFromScan(scan) {
   return {
     valid: data.valid === true,
     reason: data.reason ?? null,
-    usedAt: data.used_at ?? null,
+    used_at: data.used_at ?? null,
     status: data.status ?? null,
+    booking_id: data.booking_id ?? null,
+    departure_city: data.departure_city ?? null,
+    destination_city: data.destination_city ?? null,
+    seat_number: data.seat_number ?? null,
+    date: data.date ?? null,
+    time: data.time ?? null,
   }
 }
 
@@ -117,7 +123,12 @@ export async function validateTicketByRef(ref) {
   return {
     valid: data.valid === true,
     reason: data.reason ?? null,
-    usedAt: data.used_at ?? null,
-    bookingId: data.booking_id ?? null,
+    used_at: data.used_at ?? null,
+    booking_id: data.booking_id ?? null,
+    departure_city: data.departure_city ?? null,
+    destination_city: data.destination_city ?? null,
+    seat_number: data.seat_number ?? null,
+    date: data.date ?? null,
+    time: data.time ?? null,
   }
 }
