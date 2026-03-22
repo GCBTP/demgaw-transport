@@ -60,7 +60,7 @@ export function DriverScanTicket() {
     return booking
   }
 
-  // Stable — jamais recréée, utilise lockRef pour éviter re-entrée
+  // Stable — jamais recréée, utilise setValidated/setLastResult directement (stables)
   const runValidate = useCallback(async (raw) => {
     if (lockRef.current) return
     lockRef.current = true
@@ -83,7 +83,18 @@ export function DriverScanTicket() {
       }
 
       playBeep(true)
-      const booking = addToHistory(data)
+      const booking = {
+        id: data.booking_id,
+        departure_city: data.departure_city,
+        destination_city: data.destination_city,
+        seat_number: data.seat_number,
+        date: data.date,
+        time: data.time,
+      }
+      setValidated((prev) => [
+        { booking, usedAt: data.used_at ?? new Date().toISOString(), key: Date.now() },
+        ...prev,
+      ])
       setLastResult({ ok: true, label: 'Embarqué ✓', booking })
     } catch (e) {
       playBeep(false)
@@ -91,7 +102,7 @@ export function DriverScanTicket() {
     } finally {
       lockRef.current = false
     }
-  }, []) // aucune dépendance → jamais recréée
+  }, []) // setValidated/setLastResult sont stables → pas de dépendances
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
