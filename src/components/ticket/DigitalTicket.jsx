@@ -209,6 +209,22 @@ export function DigitalTicket({
             aria-hidden
           />
 
+          {/* tampon UTILISÉ */}
+          {used ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+              aria-hidden
+            >
+              <div
+                className="rotate-[-30deg] rounded border-4 border-red-600 px-4 py-2 text-center opacity-70"
+              >
+                <p className="text-2xl font-black uppercase tracking-widest text-red-600">
+                  Utilisé
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <div className="relative px-5 pb-5 pt-4">
             <div className="flex items-start justify-between gap-3 border-b border-dashed border-slate-300 pb-4">
               <div>
