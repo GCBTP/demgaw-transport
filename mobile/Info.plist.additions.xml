@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Permissions à ajouter dans ios/App/App/Info.plist après `npx cap add ios` -->
+<plist version="1.0">
+<dict>
+    <!-- Caméra (scan QR) -->
+    <key>NSCameraUsageDescription</key>
+    <string>DemGaw utilise la caméra pour scanner les QR codes des billets.</string>
+
+    <!-- Réseau local -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>DemGaw nécessite l'accès réseau pour se connecter aux serveurs.</string>
+
+    <!-- Téléchargement fichiers -->
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+
+    <!-- Orientation portrait uniquement -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+</dict>
+</plist>

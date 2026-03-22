@@ -1,0 +1,18 @@
+{
+  "name": "Demgaw Transport",
+  "short_name": "DemGaw",
+  "description": "Réservation de transport interurbain au Sénégal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#00853F",
+  "theme_color": "#00853F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
