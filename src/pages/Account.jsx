@@ -9,14 +9,14 @@ import {
   Sparkles,
   Ticket,
 } from 'lucide-react'
-import { fetchBookingsForUser } from '../supabase/bookings'
+import { fetchBookingsForUser, subscribeBookings } from '../supabase/bookings'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { BookingCard } from '../components/bookings/BookingCard'
 import { TicketModal } from '../components/ticket/TicketModal'
 import { formatTripDateLabel, formatXOF } from '../data/trips'
 import { useAuth } from '../hooks/useAuth'
-import { isPaidStatus, needsPayment } from '../utils/bookingPayment'
+import { isPaidStatus, isTicketValidStatus, needsPayment } from '../utils/bookingPayment'
 
 /** Espace voyageur : réservations et billets (tous les utilisateurs connectés). */
 export function Account() {
@@ -51,7 +51,8 @@ export function Account() {
   useEffect(() => {
     if (!user?.uid) return undefined
     let cancelled = false
-    ;(async () => {
+
+    async function load() {
       setBookingsLoading(true)
       setBookingsError(null)
       try {
@@ -65,14 +66,21 @@ export function Account() {
       } finally {
         if (!cancelled) setBookingsLoading(false)
       }
-    })()
+    }
+
+    load()
+    const unsubscribe = subscribeBookings(
+      () => { if (!cancelled) load() },
+      () => {},
+    )
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [user?.uid])
 
   const paidList = useMemo(
-    () => bookings.filter((b) => isPaidStatus(b.status)),
+    () => bookings.filter((b) => isTicketValidStatus(b.status)),
     [bookings],
   )
   const pendingPayList = useMemo(

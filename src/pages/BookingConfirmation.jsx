@@ -8,7 +8,7 @@ import {
   Loader2,
   Ticket,
 } from 'lucide-react'
-import { getBookingById } from '../supabase/bookings'
+import { getBookingById, subscribeBookings } from '../supabase/bookings'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DigitalTicket } from '../components/ticket/DigitalTicket'
@@ -18,28 +18,11 @@ import { isPaidStatus, needsPayment } from '../utils/bookingPayment'
 import { loadTicketCache } from '../utils/ticketStorage'
 
 function statusBadge(status) {
-  if (status === 'paid') {
-    return {
-      label: 'Payé',
-      className: 'bg-emerald-100 text-emerald-900',
-    }
-  }
-  if (status === 'pending_payment') {
-    return {
-      label: 'Paiement en attente',
-      className: 'bg-amber-100 text-amber-900',
-    }
-  }
-  if (status === 'confirmed') {
-    return {
-      label: 'À payer',
-      className: 'bg-amber-100 text-amber-900',
-    }
-  }
-  return {
-    label: status || '—',
-    className: 'bg-slate-100 text-slate-800',
-  }
+  if (status === 'paid') return { label: 'Payé', className: 'bg-emerald-100 text-emerald-900' }
+  if (status === 'used') return { label: 'Déjà utilisé', className: 'bg-slate-200 text-slate-700' }
+  if (status === 'pending_payment') return { label: 'Paiement en attente', className: 'bg-amber-100 text-amber-900' }
+  if (status === 'confirmed') return { label: 'À payer', className: 'bg-amber-100 text-amber-900' }
+  return { label: status || '—', className: 'bg-slate-100 text-slate-800' }
 }
 
 export function BookingConfirmation() {
@@ -123,8 +106,13 @@ export function BookingConfirmation() {
       }
     }
     if (bookingId && user) load()
+    const unsubscribe = subscribeBookings(
+      () => { if (!cancelled && bookingId && user) load() },
+      () => {},
+    )
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [bookingId, user, loadBooking])
 
