@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Demgaw Transport</string>
+    <string name="title_activity_main">Demgaw Transport</string>
+    <string name="package_name">sn.demgaw.transport</string>
+    <string name="custom_url_scheme">sn.demgaw.transport</string>
+</resources>
