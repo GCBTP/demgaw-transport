@@ -193,7 +193,7 @@ export function DriverScanTicket() {
           value={refValue}
           onChange={(e) => setRefValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && refValue.trim() && !refBusy) e.currentTarget.form?.requestSubmit?.() }}
-          placeholder="Court ID (ex: A1B2C3D4) ou UUID complet"
+          placeholder="UUID complet du billet (affiché sous le QR)"
           className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           autoComplete="off"
           spellCheck={false}
@@ -207,12 +207,12 @@ export function DriverScanTicket() {
             setLastResult(null)
             setRefBusy(true)
             try {
-              const input = refValue.trim()
-              let fullId = input
-              if (input.length < 36) {
-                const { data: found } = await supabase.from('bookings').select('id').ilike('id', `${input.toLowerCase()}%`).limit(1).maybeSingle()
-                if (!found) { playBeep(false); setLastResult({ ok: false, label: 'Réservation introuvable' }); return }
-                fullId = found.id
+              const fullId = refValue.trim()
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+              if (!uuidRegex.test(fullId)) {
+                playBeep(false)
+                setLastResult({ ok: false, label: 'Format invalide — entrez le UUID complet affiché sous le QR du billet' })
+                return
               }
               const r = await validateTicketManuallyByBookingId(fullId)
               if (!r.valid) {
