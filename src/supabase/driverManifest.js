@@ -97,3 +97,27 @@ export async function validateTicketManuallyByBookingId(bookingId) {
     status: data.status ?? null,
   }
 }
+
+/**
+ * Validation manuelle par référence courte (ex: A1B2C3D4) ou UUID complet.
+ * @param {string} ref
+ * @returns {Promise<{valid:boolean, reason:string|null, usedAt: string|null, bookingId: string|null}>}
+ */
+export async function validateTicketByRef(ref) {
+  const { data, error } = await supabase.rpc(
+    'driver_validate_ticket_by_ref',
+    { p_ref: ref.trim() },
+  )
+
+  if (error) throw new Error(error.message)
+  if (!data || typeof data !== 'object') {
+    throw new Error('Réponse de validation inattendue')
+  }
+
+  return {
+    valid: data.valid === true,
+    reason: data.reason ?? null,
+    usedAt: data.used_at ?? null,
+    bookingId: data.booking_id ?? null,
+  }
+}

@@ -5,7 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { supabase } from '../supabase/client'
-import { validateTicketManuallyByBookingId } from '../supabase/driverManifest'
+import { validateTicketByRef, validateTicketManuallyByBookingId } from '../supabase/driverManifest'
 
 const REASON_LABEL = {
   TICKET_QR_SECRET_NOT_SET: 'Configuration billet indisponible',
@@ -193,7 +193,7 @@ export function DriverScanTicket() {
           value={refValue}
           onChange={(e) => setRefValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && refValue.trim() && !refBusy) e.currentTarget.form?.requestSubmit?.() }}
-          placeholder="UUID complet du billet (affiché sous le QR)"
+          placeholder="Réf. billet (ex: A1B2C3D4) ou UUID complet"
           className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           autoComplete="off"
           spellCheck={false}
@@ -207,20 +207,17 @@ export function DriverScanTicket() {
             setLastResult(null)
             setRefBusy(true)
             try {
-              const fullId = refValue.trim()
-              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-              if (!uuidRegex.test(fullId)) {
-                playBeep(false)
-                setLastResult({ ok: false, label: 'Format invalide — entrez le UUID complet affiché sous le QR du billet' })
-                return
-              }
-              const r = await validateTicketManuallyByBookingId(fullId)
+              const r = await validateTicketByRef(refValue)
               if (!r.valid) {
                 playBeep(false)
                 setLastResult({ ok: false, label: REASON_LABEL[r.reason] || r.reason || 'Billet refusé' })
                 return
               }
-              const { data: booking } = await supabase.from('bookings').select('id, seat_number, departure_city, destination_city, date, time, operator').eq('id', fullId).maybeSingle()
+              const { data: booking } = await supabase
+                .from('bookings')
+                .select('id, seat_number, departure_city, destination_city, date, time, operator')
+                .eq('id', r.bookingId)
+                .maybeSingle()
               playBeep(true)
               addToHistory(booking, r.usedAt)
               setLastResult({ ok: true, label: 'Embarqué ✓', booking })
