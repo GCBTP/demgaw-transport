@@ -11,7 +11,7 @@ create or replace function public.driver_validate_and_use_ticket_qr_payload(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
 declare
   v_secret text;

@@ -5,6 +5,7 @@ import {
   Camera,
   CheckCircle2,
   ClipboardPaste,
+  Hash,
   Loader2,
   ShieldCheck,
   XCircle,
@@ -15,6 +16,7 @@ import { Card } from '../components/ui/Card'
 import { supabase } from '../supabase/client'
 import {
   consumeTicketFromScan,
+  validateTicketManuallyByBookingId,
   validateTicketQrFromScan,
 } from '../supabase/driverManifest'
 
@@ -30,7 +32,9 @@ const REASON_LABEL = {
 
 export function DriverScanTicket() {
   const [pasteValue, setPasteValue] = useState('')
+  const [refValue, setRefValue] = useState('')
   const [busy, setBusy] = useState(false)
+  const [refBusy, setRefBusy] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const [scanPayload, setScanPayload] = useState(null)
@@ -282,6 +286,70 @@ export function DriverScanTicket() {
             </>
           ) : (
             'Valider'
+          )}
+        </Button>
+      </Card>
+
+      <Card className="p-5">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <Hash className="h-4 w-4 text-brand-600" aria-hidden />
+          Référence du billet (ID)
+        </label>
+        <input
+          type="text"
+          value={refValue}
+          onChange={(e) => setRefValue(e.target.value)}
+          placeholder="ex: a1b2c3d4-... (UUID complet)"
+          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-inner placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <Button
+          type="button"
+          size="lg"
+          className="mt-4 h-14 w-full text-base font-semibold"
+          disabled={refBusy || !refValue.trim()}
+          onClick={async () => {
+            setError(null)
+            setResult(null)
+            setConfirmation(null)
+            setScanPayload(null)
+            setRefBusy(true)
+            try {
+              const r = await validateTicketManuallyByBookingId(refValue.trim())
+              if (!r.valid) {
+                setResult({
+                  ok: false,
+                  reason: r.reason,
+                  label: (r.reason && REASON_LABEL[r.reason]) || r.reason || 'Billet refusé',
+                })
+                return
+              }
+              const { data: booking, error: bErr } = await supabase
+                .from('bookings')
+                .select('id, trip_id, seat_number, status, departure_city, destination_city, date, time, operator, price')
+                .eq('id', refValue.trim())
+                .maybeSingle()
+              if (bErr) throw new Error(bErr.message)
+              setConfirmation({ ok: true, label: 'Billet validé et embarqué', usedAt: r.usedAt })
+              setResult({ ok: true, booking: { ...booking, status: 'used' } })
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e))
+            } finally {
+              setRefBusy(false)
+            }
+          }}
+        >
+          {refBusy ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              Validation…
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-5 w-5" aria-hidden />
+              Valider et embarquer
+            </>
           )}
         </Button>
       </Card>

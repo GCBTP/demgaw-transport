@@ -31,7 +31,7 @@ create or replace function public.create_ticket_qr_payload(p_booking_id uuid)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
 declare
   v_user uuid := auth.uid();
@@ -99,7 +99,7 @@ create or replace function public.validate_ticket_qr_payload(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, extensions, auth
 as $$
 declare
   v_secret text;
