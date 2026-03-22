@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import { Bus, LogOut, Menu, QrCode, Shield, Truck, X } from 'lucide-react'
+import { LogOut, Menu, QrCode, Shield, Truck, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
@@ -86,9 +86,7 @@ export function Header() {
           className="flex items-center gap-2.5 text-slate-900"
           onClick={() => setOpen(false)}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-[0_4px_14px_-4px_rgba(5,150,105,0.55)]">
-            <Bus className="h-[22px] w-[22px]" aria-hidden />
-          </span>
+          <img src="/logo.svg" alt="DemGaw" className="h-10 w-10 object-contain" />
           <div className="leading-tight">
             <span className="block text-lg font-bold tracking-tight">DemGaw</span>
             <span className="hidden text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:block">
