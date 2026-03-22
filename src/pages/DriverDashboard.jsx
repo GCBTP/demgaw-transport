@@ -58,11 +58,6 @@ export function DriverDashboard() {
   }, [searchInput])
 
   const loadTrips = useCallback(async () => {
-    if (!op) {
-      setTripsToday([])
-      setTripsLoading(false)
-      return
-    }
     setTripsLoading(true)
     setTripsError(null)
     const { data, error } = await supabase
@@ -71,7 +66,6 @@ export function DriverDashboard() {
         'id, departure_city, destination_city, date, time, available_seats, booked_seats, operator',
       )
       .eq('date', todayStr)
-      .eq('operator', op)
       .order('time', { ascending: true })
     if (error) {
       setTripsError(error.message)
@@ -80,14 +74,9 @@ export function DriverDashboard() {
       setTripsToday(data ?? [])
     }
     setTripsLoading(false)
-  }, [op, todayStr])
+  }, [todayStr])
 
   const loadManifest = useCallback(async () => {
-    if (!op) {
-      setManifest([])
-      setManifestLoading(false)
-      return
-    }
     setManifestLoading(true)
     setManifestError(null)
     try {
@@ -102,7 +91,7 @@ export function DriverDashboard() {
     } finally {
       setManifestLoading(false)
     }
-  }, [op, onlyToday, todayStr, debouncedSearch])
+  }, [onlyToday, todayStr, debouncedSearch])
 
   useEffect(() => {
     void loadTrips()
@@ -113,10 +102,6 @@ export function DriverDashboard() {
   }, [loadManifest])
 
   useEffect(() => {
-    if (!op) {
-      setPaidTodayByTrip(new Map())
-      return
-    }
     let cancelled = false
     ;(async () => {
       try {
@@ -139,7 +124,7 @@ export function DriverDashboard() {
     return () => {
       cancelled = true
     }
-  }, [op, todayStr])
+  }, [todayStr])
 
   const handleManualValidate = useCallback(
     async (bookingId, currentStatus) => {
@@ -183,18 +168,6 @@ export function DriverDashboard() {
     },
     [loadManifest],
   )
-
-  if (!user?.driverOperator?.trim()) {
-    return (
-      <Card className="border-amber-100 bg-amber-50/50 p-6">
-        <p className="font-semibold text-amber-950">Opérateur non configuré</p>
-        <p className="mt-2 text-sm text-amber-900">
-          Contactez un administrateur pour associer un libellé opérateur à votre
-          compte chauffeur.
-        </p>
-      </Card>
-    )
-  }
 
   return (
     <div className="mx-auto max-w-lg space-y-8 pb-4">
