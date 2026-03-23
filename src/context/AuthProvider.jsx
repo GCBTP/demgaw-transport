@@ -73,9 +73,24 @@ export function AuthProvider({ children }) {
       }
     })
 
+    // Sur Android : quand l'app revient au premier plan après OAuth,
+    // re-vérifier la session au cas où onAuthStateChange a manqué l'événement.
+    let appListener = null
+    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('appStateChange', ({ isActive }) => {
+          if (!isActive || !mounted) return
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user && mounted) applySession(session)
+          })
+        }).then((l) => { appListener = l })
+      })
+    }
+
     return () => {
       mounted = false
       subscription.unsubscribe()
+      appListener?.remove?.()
     }
   }, [])
 
