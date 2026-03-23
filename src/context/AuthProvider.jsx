@@ -47,8 +47,15 @@ export function AuthProvider({ children }) {
       setLoading(false)
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return
+      if (error) {
+        // Refresh token invalide — nettoyer la session corrompue
+        supabase.auth.signOut().catch(() => {})
+        setUser(null)
+        setLoading(false)
+        return
+      }
       setLoading(true)
       applySession(session)
     })
