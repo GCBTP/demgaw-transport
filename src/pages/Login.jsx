@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/layout/AuthLayout'
 import { Button } from '../components/ui/Button'
@@ -9,11 +9,21 @@ import { supabase } from '../supabase/client'
 import { getAuthErrorMessage } from '../utils/authErrors'
 
 export function Login() {
-  const { login, loginWithGoogle } = useAuth()
+  const { login, loginWithGoogle, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname ?? '/compte'
   const registeredHint = location.state?.registered
+
+  // Redirect automatique après OAuth Google (deep link)
+  useEffect(() => {
+    if (!user) return
+    if (user.role === 'driver') {
+      navigate('/chauffeur', { replace: true })
+    } else {
+      navigate(from, { replace: true })
+    }
+  }, [user, navigate, from])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
