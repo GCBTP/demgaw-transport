@@ -88,11 +88,13 @@ export function AuthProvider({ children }) {
   }, [])
 
   const loginWithGoogle = useCallback(async () => {
+    const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+    const redirectTo = isCapacitor
+      ? 'sn.demgaw.transport://callback'
+      : `${window.location.origin}/compte`
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/compte`,
-      },
+      options: { redirectTo },
     })
     if (error) throw error
   }, [])
