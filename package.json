@@ -20,7 +20,9 @@
     "@capacitor/browser": "^8.0.2",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/filesystem": "^8.1.2",
     "@capacitor/ios": "^8.2.0",
+    "@capacitor/share": "^8.0.1",
     "@supabase/supabase-js": "^2.99.3",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
@@ -47,6 +49,7 @@
     "pg": "^8.14.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^8.0.1"
+    "vite": "^8.0.1",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }

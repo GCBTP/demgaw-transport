@@ -1,11 +1,40 @@
 import { toPng } from 'html-to-image'
 import { jsPDF } from 'jspdf'
 
-/** Options communes : sans lecture des @font-face distants (Google Fonts → cssRules bloqué en cross-origin). */
+const isCapacitor = () =>
+  typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+
+/** Options communes : sans lecture des @font-face distants. */
 const ticketImageOptions = {
   cacheBust: true,
   backgroundColor: '#ffffff',
   skipFonts: true,
+}
+
+/** Sauvegarde un fichier sur Android via Capacitor Filesystem + Share. */
+async function saveAndShareOnAndroid(base64Data, filename, mimeType) {
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+  const { Share } = await import('@capacitor/share')
+
+  // Extraire la partie base64 pure (retirer le préfixe data:...)
+  const base64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data
+
+  await Filesystem.writeFile({
+    path: filename,
+    data: base64,
+    directory: Directory.Cache,
+  })
+
+  const { uri } = await Filesystem.getUri({
+    path: filename,
+    directory: Directory.Cache,
+  })
+
+  await Share.share({
+    title: 'Billet DemGaw',
+    url: uri,
+    dialogTitle: 'Enregistrer ou partager le billet',
+  })
 }
 
 /**
@@ -14,13 +43,17 @@ const ticketImageOptions = {
  */
 export async function exportTicketAsPng(element, filename) {
   if (!element) return
-  const url = await toPng(element, {
-    ...ticketImageOptions,
-    pixelRatio: 3,
-  })
+  const url = await toPng(element, { ...ticketImageOptions, pixelRatio: 3 })
+  const name = filename ?? `demgaw-billet-${Date.now()}.png`
+
+  if (isCapacitor()) {
+    await saveAndShareOnAndroid(url, name, 'image/png')
+    return
+  }
+
   const a = document.createElement('a')
   a.href = url
-  a.download = filename ?? `demgaw-billet-${Date.now()}.png`
+  a.download = name
   a.click()
 }
 
@@ -30,15 +63,10 @@ export async function exportTicketAsPng(element, filename) {
  */
 export async function exportTicketAsPdf(element, filename) {
   if (!element) return
-  const imgData = await toPng(element, {
-    ...ticketImageOptions,
-    pixelRatio: 2,
-  })
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
+  const imgData = await toPng(element, { ...ticketImageOptions, pixelRatio: 2 })
+  const name = filename ?? `demgaw-billet-${Date.now()}.pdf`
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const img = new Image()
   await new Promise((resolve, reject) => {
     img.onload = resolve
@@ -62,5 +90,12 @@ export async function exportTicketAsPdf(element, filename) {
   const x = (pageW - imgW) / 2
   const y = margin + (maxH - imgH) / 2
   pdf.addImage(imgData, 'PNG', x, y, imgW, imgH)
-  pdf.save(filename ?? `demgaw-billet-${Date.now()}.pdf`)
+
+  if (isCapacitor()) {
+    const pdfBase64 = pdf.output('datauristring')
+    await saveAndShareOnAndroid(pdfBase64, name, 'application/pdf')
+    return
+  }
+
+  pdf.save(name)
 }
