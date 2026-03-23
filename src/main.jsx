@@ -12,10 +12,12 @@ import { supabase } from './supabase/client.js'
 async function handleDeepLink(url) {
   if (!url) return
   try {
+    // Échanger le code PKCE contre une session d'abord
+    const { error } = await supabase.auth.exchangeCodeForSession(url)
+    if (error) console.warn('exchangeCodeForSession error:', error.message)
+    // Fermer le navigateur après
     const { Browser } = await import('@capacitor/browser')
     await Browser.close().catch(() => {})
-    // PKCE : échanger le code contre une session
-    await supabase.auth.exchangeCodeForSession(url)
   } catch (e) {
     console.warn('Deep link OAuth error', e)
   }

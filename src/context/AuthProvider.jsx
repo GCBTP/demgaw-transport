@@ -55,10 +55,15 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
-      setLoading(true)
-      applySession(session)
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        setLoading(true)
+        applySession(session)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setLoading(false)
+      }
     })
 
     return () => {
