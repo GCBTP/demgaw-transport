@@ -15,6 +15,7 @@ import { BookTrip } from './pages/BookTrip'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { ResetPassword } from './pages/ResetPassword'
 import { Trips } from './pages/Trips'
 import { WavePayment } from './pages/WavePayment'
 import { DriverDashboard } from './pages/DriverDashboard'
@@ -27,6 +28,7 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/"
         element={

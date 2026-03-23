@@ -32,7 +32,7 @@ export function Login() {
     setError('')
     try {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/compte`,
+        redirectTo: `${window.location.origin}/reset-password`,
       })
       if (err) throw err
       setResetSent(true)
