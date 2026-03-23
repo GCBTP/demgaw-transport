@@ -19,6 +19,29 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetBusy, setResetBusy] = useState(false)
+
+  async function handleForgotPassword(e) {
+    e.preventDefault()
+    if (!email.trim()) {
+      setError('Entrez votre e-mail pour réinitialiser le mot de passe.')
+      return
+    }
+    setResetBusy(true)
+    setError('')
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/compte`,
+      })
+      if (err) throw err
+      setResetSent(true)
+    } catch (err) {
+      setError(getAuthErrorMessage(err))
+    } finally {
+      setResetBusy(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -78,6 +101,11 @@ export function Login() {
             ouvrez le lien reçu puis connectez-vous.
           </p>
         ) : null}
+        {resetSent ? (
+          <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+            Un e-mail de réinitialisation a été envoyé. Vérifiez votre boîte mail.
+          </p>
+        ) : null}
         {error ? (
           <p
             className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800"
@@ -118,9 +146,9 @@ export function Login() {
           <a
             href="#"
             className="font-medium text-brand-800 hover:underline"
-            onClick={(e) => e.preventDefault()}
+            onClick={handleForgotPassword}
           >
-            Mot de passe oublié ?
+            {resetBusy ? 'Envoi…' : 'Mot de passe oublié ?'}
           </a>
         </div>
         <Button type="submit" className="w-full" size="lg" disabled={submitting}>
