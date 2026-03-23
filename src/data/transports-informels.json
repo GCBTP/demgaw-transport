@@ -1,0 +1,92 @@
+[
+  {
+    "type": "car_rapide",
+    "ligne": "Liberté 5 – Petersen",
+    "numero": "Ligne 8",
+    "depart": "Liberté 5",
+    "arrivee": "Petersen (Plateau)",
+    "quartiers": ["Liberté 5", "Liberté 6", "Fass", "Petersen"],
+    "tarif": 200,
+    "devise": "FCFA"
+  },
+  {
+    "type": "car_rapide",
+    "ligne": "Parcelles – Pompiers",
+    "numero": "Ligne 36",
+    "depart": "Parcelles Assainies",
+    "arrivee": "Pompiers (Plateau)",
+    "quartiers": ["Parcelles Assainies", "Cambérène", "Patte d'Oie", "Pompiers"],
+    "tarif": 200,
+    "devise": "FCFA"
+  },
+  {
+    "type": "car_rapide",
+    "ligne": "Guédiawaye – Sandaga",
+    "numero": "Ligne 15",
+    "depart": "Guédiawaye",
+    "arrivee": "Sandaga",
+    "quartiers": ["Guédiawaye", "Golf Sud", "Thiaroye", "Sandaga"],
+    "tarif": 300,
+    "devise": "FCFA"
+  },
+  {
+    "type": "clando",
+    "ligne": "Pikine – Colobane",
+    "numero": "Clando Pikine",
+    "depart": "Pikine",
+    "arrivee": "Colobane",
+    "quartiers": ["Pikine", "Thiaroye sur Mer", "Colobane"],
+    "tarif": 250,
+    "devise": "FCFA"
+  },
+  {
+    "type": "clando",
+    "ligne": "Rufisque – Plateau",
+    "numero": "Clando Rufisque",
+    "depart": "Rufisque",
+    "arrivee": "Plateau",
+    "quartiers": ["Rufisque", "Bambilor", "Keur Massar", "Plateau"],
+    "tarif": 500,
+    "devise": "FCFA"
+  },
+  {
+    "type": "clando",
+    "ligne": "Yeumbeul – Petersen",
+    "numero": "Clando Yeumbeul",
+    "depart": "Yeumbeul",
+    "arrivee": "Petersen",
+    "quartiers": ["Yeumbeul", "Thiaroye", "Pikine", "Petersen"],
+    "tarif": 350,
+    "devise": "FCFA"
+  },
+  {
+    "type": "dem_dikk",
+    "ligne": "Dakar – Thiès",
+    "numero": "DDD-01",
+    "depart": "Dakar (Gare Routière Pompiers)",
+    "arrivee": "Thiès (Gare Routière)",
+    "quartiers": ["Dakar", "Rufisque", "Thiès"],
+    "tarif": 1500,
+    "devise": "FCFA"
+  },
+  {
+    "type": "dem_dikk",
+    "ligne": "Dakar – Saint-Louis",
+    "numero": "DDD-02",
+    "depart": "Dakar (Pompiers)",
+    "arrivee": "Saint-Louis",
+    "quartiers": ["Dakar", "Thiès", "Touba", "Saint-Louis"],
+    "tarif": 4500,
+    "devise": "FCFA"
+  },
+  {
+    "type": "dem_dikk",
+    "ligne": "Dakar – Ziguinchor",
+    "numero": "DDD-03",
+    "depart": "Dakar (Pompiers)",
+    "arrivee": "Ziguinchor",
+    "quartiers": ["Dakar", "Kaolack", "Fatick", "Ziguinchor"],
+    "tarif": 7000,
+    "devise": "FCFA"
+  }
+]

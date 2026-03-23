@@ -1,7 +1,12 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'DM Sans', 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /* Couleurs sénégalaises */
+  --color-sn-vert:  #00853F;
+  --color-sn-jaune: #FDEF42;
+  --color-sn-rouge: #E31B23;
   /* App green — InDrive / mobility apps */
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
