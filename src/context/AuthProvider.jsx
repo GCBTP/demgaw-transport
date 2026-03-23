@@ -89,14 +89,27 @@ export function AuthProvider({ children }) {
 
   const loginWithGoogle = useCallback(async () => {
     const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
-    const redirectTo = isCapacitor
-      ? 'sn.demgaw.transport://callback'
-      : `${window.location.origin}/compte`
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo },
-    })
-    if (error) throw error
+
+    if (isCapacitor) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'sn.demgaw.transport://callback',
+          skipBrowserRedirect: true,
+        },
+      })
+      if (error) throw error
+      if (data?.url) {
+        const { Browser } = await import('@capacitor/browser')
+        await Browser.open({ url: data.url, windowName: '_self' })
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/compte` },
+      })
+      if (error) throw error
+    }
   }, [])
 
   const logout = useCallback(async () => {

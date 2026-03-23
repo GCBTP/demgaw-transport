@@ -8,15 +8,16 @@ import { Onboarding, shouldShowOnboarding } from './components/onboarding/Onboar
 import { ToastProvider } from './components/ui/Toast.jsx'
 import { supabase } from './supabase/client.js'
 
-// Intercepte le deep link OAuth sur Android (Capacitor)
+// Intercepte le deep link OAuth sur Android (Capacitor) — flux PKCE
 async function handleDeepLink(url) {
   if (!url) return
-  const u = new URL(url)
-  const params = new URLSearchParams(u.hash.replace('#', ''))
-  const accessToken = params.get('access_token')
-  const refreshToken = params.get('refresh_token')
-  if (accessToken) {
-    await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken ?? '' })
+  try {
+    const { Browser } = await import('@capacitor/browser')
+    await Browser.close().catch(() => {})
+    // PKCE : échanger le code contre une session
+    await supabase.auth.exchangeCodeForSession(url)
+  } catch (e) {
+    console.warn('Deep link OAuth error', e)
   }
 }
 
