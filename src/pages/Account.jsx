@@ -17,6 +17,8 @@ import { TicketModal } from '../components/ticket/TicketModal'
 import { formatTripDateLabel, formatXOF } from '../data/trips'
 import { useAuth } from '../hooks/useAuth'
 import { isPaidStatus, isTicketValidStatus, needsPayment } from '../utils/bookingPayment'
+import { loadBookingsCache, saveBookingsCache } from '../utils/offlineCache'
+import { useNetworkStatus } from '../hooks/useNetworkStatus'
 
 /** Espace voyageur : réservations et billets (tous les utilisateurs connectés). */
 export function Account() {
@@ -43,9 +45,11 @@ export function Account() {
     user?.email?.split('@')[0] ||
     'Passager'
 
-  const [bookings, setBookings] = useState([])
+  const isOnline = useNetworkStatus()
+  const [bookings, setBookings] = useState(() => [])
   const [bookingsLoading, setBookingsLoading] = useState(true)
   const [bookingsError, setBookingsError] = useState(null)
+  const [fromCache, setFromCache] = useState(false)
   const [ticketBooking, setTicketBooking] = useState(null)
 
   useEffect(() => {
@@ -57,11 +61,23 @@ export function Account() {
       setBookingsError(null)
       try {
         const list = await fetchBookingsForUser(user.uid)
-        if (!cancelled) setBookings(list)
+        if (!cancelled) {
+          setBookings(list)
+          setFromCache(false)
+          saveBookingsCache(user.uid, list)
+        }
       } catch (e) {
         if (!cancelled) {
-          setBookings([])
-          setBookingsError(e?.message ?? 'Impossible de charger vos réservations.')
+          const cached = loadBookingsCache(user.uid)
+          if (cached) {
+            setBookings(cached)
+            setFromCache(true)
+            setBookingsError(null)
+          } else {
+            setBookings([])
+            setFromCache(false)
+            setBookingsError(e?.message ?? 'Impossible de charger vos réservations.')
+          }
         }
       } finally {
         if (!cancelled) setBookingsLoading(false)
@@ -201,6 +217,11 @@ export function Account() {
               Chaque carte regroupe le trajet, le statut du billet et les
               actions rapides.
             </p>
+            {fromCache ? (
+              <p className="mt-1 text-xs text-amber-600">
+                Données en cache — reconnectez-vous pour mettre à jour
+              </p>
+            ) : null}
           </div>
           <Link to="/trips" className="shrink-0">
             <Button variant="secondary" size="sm" className="gap-2">
