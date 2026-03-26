@@ -1,36 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/layout/AuthLayout'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { supabase } from '../supabase/client'
+import { useAuth } from '../hooks/useAuth'
 import { getAuthErrorMessage } from '../utils/authErrors'
 
 export function ResetPassword() {
   const navigate = useNavigate()
-  const [ready, setReady] = useState(false)
+  const { recoverySession, clearRecoverySession } = useAuth()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    // Supabase échange automatiquement le code PKCE au chargement de la page
-    // et déclenche PASSWORD_RECOVERY via onAuthStateChange
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setReady(true)
-      }
-    })
-
-    // Vérifier si une session recovery est déjà active (rechargement de page)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -48,7 +32,8 @@ export function ResetPassword() {
       const { error: err } = await supabase.auth.updateUser({ password })
       if (err) throw err
       setSuccess(true)
-      setTimeout(() => navigate('/login', { replace: true }), 2500)
+      await clearRecoverySession()
+      setTimeout(() => navigate('/compte', { replace: true }), 2500)
     } catch (err) {
       setError(getAuthErrorMessage(err))
     } finally {
@@ -56,7 +41,7 @@ export function ResetPassword() {
     }
   }
 
-  if (!ready) {
+  if (!recoverySession) {
     return (
       <AuthLayout title="Réinitialisation" subtitle="Vérification du lien…">
         <div className="flex justify-center py-8">
@@ -68,7 +53,7 @@ export function ResetPassword() {
 
   if (success) {
     return (
-      <AuthLayout title="Mot de passe modifié" subtitle="Vous allez être redirigé vers la connexion.">
+      <AuthLayout title="Mot de passe modifié" subtitle="Vous allez être redirigé vers votre compte.">
         <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-center text-sm text-green-800">
           Mot de passe mis à jour avec succès !
         </p>

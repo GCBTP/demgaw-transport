@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase/client'
 import { fetchUserProfile } from '../supabase/profiles'
 import { AuthContext } from './auth-context'
@@ -30,6 +30,9 @@ function mapUser(u, profile = { role: 'client', driverOperator: null }) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [recoverySession, setRecoverySession] = useState(false)
+  // Ref pour éviter les problèmes de closure dans onAuthStateChange
+  const recoveryRef = useRef(false)
 
   useEffect(() => {
     let mounted = true
@@ -64,10 +67,21 @@ export function AuthProvider({ children }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Stocker la session de récupération sans connecter l'utilisateur normalement.
+        // Le composant ResetPassword lira recoverySession depuis le contexte.
+        recoveryRef.current = true
+        setRecoverySession(true)
+        setLoading(false)
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        // Si on est en mode récupération de mot de passe, ignorer le SIGNED_IN automatique
+        // pour ne pas connecter l'utilisateur avant qu'il ait défini son nouveau mot de passe.
+        if (recoveryRef.current) return
         setLoading(true)
         applySession(session)
       } else if (event === 'SIGNED_OUT') {
+        recoveryRef.current = false
+        setRecoverySession(false)
         setUser(null)
         setLoading(false)
       }
@@ -143,6 +157,18 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }, [])
 
+  // Appelée par ResetPassword après avoir défini le nouveau mot de passe.
+  // Charge la session normalement pour connecter l'utilisateur.
+  const clearRecoverySession = useCallback(async () => {
+    recoveryRef.current = false
+    setRecoverySession(false)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const profile = await fetchUserProfile(session.user.id)
+      setUser(mapUser(session.user, profile))
+    }
+  }, [])
+
   const isAdmin = user?.role === 'admin'
   const isDriver = user?.role === 'driver'
 
@@ -156,8 +182,10 @@ export function AuthProvider({ children }) {
       logout,
       isAdmin,
       isDriver,
+      recoverySession,
+      clearRecoverySession,
     }),
-    [user, loading, login, loginWithGoogle, register, logout, isAdmin, isDriver],
+    [user, loading, login, loginWithGoogle, register, logout, isAdmin, isDriver, recoverySession, clearRecoverySession],
   )
 
   return (

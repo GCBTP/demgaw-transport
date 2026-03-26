@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bus,
   Calendar,
+  KeyRound,
   Loader2,
   LogOut,
   Sparkles,
@@ -16,6 +17,8 @@ import { BookingCard } from '../components/bookings/BookingCard'
 import { TicketModal } from '../components/ticket/TicketModal'
 import { formatTripDateLabel, formatXOF } from '../data/trips'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../supabase/client'
+import { getAuthErrorMessage } from '../utils/authErrors'
 import { isPaidStatus, isTicketValidStatus, needsPayment } from '../utils/bookingPayment'
 import { loadBookingsCache, saveBookingsCache } from '../utils/offlineCache'
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
@@ -46,6 +49,40 @@ export function Account() {
     'Passager'
 
   const isOnline = useNetworkStatus()
+
+  // Changement de mot de passe
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwBusy, setPwBusy] = useState(false)
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    setPwError('')
+    setPwSuccess(false)
+    if (pwNew.length < 6) {
+      setPwError('Le mot de passe doit contenir au moins 6 caractères.')
+      return
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError('Les mots de passe ne correspondent pas.')
+      return
+    }
+    setPwBusy(true)
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password: pwNew })
+      if (err) throw err
+      setPwSuccess(true)
+      setPwNew('')
+      setPwConfirm('')
+    } catch (err) {
+      setPwError(getAuthErrorMessage(err))
+    } finally {
+      setPwBusy(false)
+    }
+  }
+
   const [bookings, setBookings] = useState(() => [])
   const [bookingsLoading, setBookingsLoading] = useState(true)
   const [bookingsError, setBookingsError] = useState(null)
@@ -285,6 +322,69 @@ export function Account() {
         booking={ticketBooking}
         passengerName={passengerDisplay}
       />
+
+      <section aria-labelledby="pw-heading">
+        <Card className="border-slate-100/90">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <KeyRound className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <h2 id="pw-heading" className="text-base font-semibold text-slate-900">
+                Changer le mot de passe
+              </h2>
+              <p className="text-sm text-slate-500">Choisissez un nouveau mot de passe pour votre compte.</p>
+            </div>
+          </div>
+          <form className="space-y-4" onSubmit={handleChangePassword}>
+            {pwError ? (
+              <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                {pwError}
+              </p>
+            ) : null}
+            {pwSuccess ? (
+              <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+                Mot de passe mis à jour avec succès !
+              </p>
+            ) : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="pw-new" className="block text-sm font-medium text-slate-700">
+                  Nouveau mot de passe
+                </label>
+                <input
+                  id="pw-new"
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="pw-confirm" className="block text-sm font-medium text-slate-700">
+                  Confirmer le mot de passe
+                </label>
+                <input
+                  id="pw-confirm"
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+            </div>
+            <Button type="submit" size="sm" disabled={pwBusy}>
+              {pwBusy ? 'Enregistrement…' : 'Mettre à jour le mot de passe'}
+            </Button>
+          </form>
+        </Card>
+      </section>
     </div>
   )
 }

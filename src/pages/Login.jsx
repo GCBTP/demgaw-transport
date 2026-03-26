@@ -153,27 +153,19 @@ export function Login() {
             />
             Se souvenir de moi
           </label>
-          <a
-            href="#"
-            className="font-medium text-brand-800 hover:underline"
+          <button
+            type="button"
+            className="font-medium text-brand-800 hover:underline disabled:opacity-50"
             onClick={handleForgotPassword}
+            disabled={resetBusy}
           >
             {resetBusy ? 'Envoi…' : 'Mot de passe oublié ?'}
-          </a>
+          </button>
         </div>
         <Button type="submit" className="w-full" size="lg" disabled={submitting}>
           {submitting ? 'Connexion…' : 'Se connecter'}
         </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          size="lg"
-          onClick={() => void handleGoogleAuth()}
-          disabled={submitting}
-        >
-          Continuer avec Google
-        </Button>
+        {/* Google OAuth désactivé temporairement */}
       </form>
     </AuthLayout>
   )
